@@ -1,8 +1,10 @@
 """CLI for markdown anki decks package."""
+
 import hashlib
 import itertools
 import os
 import re
+import typing as t
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -17,7 +19,6 @@ from genanki.model import Model
 
 from markdown_anki_decks.sync import sync_deck, sync_model
 from markdown_anki_decks.utils import print_success
-import typing as t
 
 app = typer.Typer()
 
@@ -199,15 +200,37 @@ def parse_markdown(
         )
 
         # wrap the contents in a section tag. the section is the answer.
+        # also extract FlashTex tags
         answer = soup.new_tag("section")
+        flashtex_tags = []
+        flashtex_id = None
         if len(contents) > 0:
+            for i, line in enumerate(contents):
+                text = line.text.strip()
+                if text.startswith("Tags:"):
+                    tags = text.removeprefix("Tags: ").split(",")
+                    tags = [x.removesuffix(" ").replace(" ", "_") for x in tags]
+                    contents.pop(i)
+                    flashtex_tags.extend(tags)
+                elif text.startswith("ID: "):
+                    flashtex_id = text.removeprefix("ID: ").strip()
+                    contents.pop(i)
+                elif "ID: " in text:
+                    id_idx = text.index("ID: ")
+                    flashtex_id = text[id_idx + 4 :]
+
             contents[0].wrap(answer)
             for content in contents[1:]:
                 answer.append(content)
+        # if flashtex_id is None:
+        #     guid = genanki.guid_for(soup_to_html_string(question), deck_id)
+        # else:
+        #     guid = genanki.guid_for(flashtex_id, deck_id)
 
         # create the note using the simple model
         note = FrontIdentifierNote(
             guid=genanki.guid_for(soup_to_html_string(question), deck_id),
+            tags=flashtex_tags,
             model=(
                 cloze_model
                 if generate_cloze_model
