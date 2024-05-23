@@ -1,6 +1,7 @@
 """CLI for markdown anki decks package."""
 
 import hashlib
+import html as html_lib
 import itertools
 import os
 import re
@@ -222,14 +223,16 @@ def parse_markdown(
             contents[0].wrap(answer)
             for content in contents[1:]:
                 answer.append(content)
-        # if flashtex_id is None:
-        #     guid = genanki.guid_for(soup_to_html_string(question), deck_id)
-        # else:
-        #     guid = genanki.guid_for(flashtex_id, deck_id)
+
+        if flashtex_id is None:
+            guid = genanki.guid_for(soup_to_html_string(question), deck_id)
+        else:
+            guid = genanki.guid_for(flashtex_id, deck_id)
+        guid = html_lib.escape(guid)
 
         # create the note using the simple model
         note = FrontIdentifierNote(
-            guid=genanki.guid_for(soup_to_html_string(question), deck_id),
+            guid=guid,
             tags=flashtex_tags,
             model=(
                 cloze_model
