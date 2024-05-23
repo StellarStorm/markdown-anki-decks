@@ -23,7 +23,42 @@ def convert_tex_delimiters(text):
     return replaced_text
 
 
-def main(filepath: str):
+def _increase_level(match):
+    return match.group(0) + "#"
+
+
+def reformat_card(text: str) -> str:
+    """
+    Change format to something like
+
+    ## Question
+    answer line 1
+    answer line 2
+    **Ref:** reference if any
+    **Tags:** tags if any
+    **ID:** card id if any
+    """
+
+    pattern = (
+        r"\*\*(Que|Ans|Ref|Tags|ID):\*\*\s*(.*?)\s*(?=\*\*(Que|Ans|Ref|Tags|ID)|$)"
+    )
+    matches = re.findall(pattern, text, flags=re.DOTALL)
+    card_values = {}
+    for match in matches:
+        key = match[0]
+        value = match[1]
+        card_values[key] = value
+
+    new_format = f"## {card_values['Que']}\n\n{card_values['Ans']}\n\n"
+    for optional_tag in ["Ref", "Tags", "ID"]:
+        if card_values.get(optional_tag) is not None:
+            new_format = (
+                f"{new_format}**{optional_tag}:** {card_values[optional_tag]}\n\n"
+            )
+    return new_format
+
+
+def main(filepath: str) -> None:
     parent_dir = os.path.dirname(filepath)
 
     img_dir = os.path.join(parent_dir, "images")
@@ -32,25 +67,16 @@ def main(filepath: str):
     with open(filepath) as f:
         contents = f.read()
 
-    x = contents.split("---")
-    title = x[0]
-    cards = x[1:]
+    title = re.findall(r"^# .*$", contents, re.MULTILINE)[0]
+    cards = re.findall(r"---\n(.*?)(?=---\n|\Z(?!.*\n))", contents, re.DOTALL)
+    if cards[-1] == r"":
+        cards = cards[:-1]
 
-    converted = [title]
+    converted = [title + "\n\n"]
     for card in cards:
-        card = (
-            card.replace("##", "###").replace("**Que:**", "##").replace("**Ans:** ", "")
-        )
-        # move frontmatter like tags to end
-        try:
-            front_idx = card.index("##")
-            if front_idx > 0:
-                old_front = card[:front_idx]
-                card = card[front_idx:] + old_front
-        except ValueError:
-            pass
-
+        card = re.sub(r"#+", _increase_level, card)
         card = card.replace("images/", "")
+        card = reformat_card(card)
         card = convert_tex_delimiters(card)
         converted.append(card)
 
