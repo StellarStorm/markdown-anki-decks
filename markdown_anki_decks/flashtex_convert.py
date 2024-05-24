@@ -4,9 +4,10 @@ import re
 import shutil
 
 import fire
+import mdformat
 
 
-def convert_tex_delimiters(text):
+def convert_tex_delimiters(text: str) -> str:
     # Define regular expression patterns to match single and double dollar signs, and equation environment syntax
     single_dollar_pattern = r"(?<!\\)\$(.*?)(?<!\\)\$"
     double_dollar_pattern = r"\$\$(.*?)\$\$"
@@ -21,6 +22,11 @@ def convert_tex_delimiters(text):
     replaced_text = replaced_text.replace("\\\n", "\\\\\n")
 
     return replaced_text
+
+
+def remove_img_resize(text: str) -> str:
+    pattern = r"!\[\]\((.*?)\s*=\s*\d+x\d+\)"
+    return re.sub(pattern, r"![](\1)", text)
 
 
 def _increase_level(match):
@@ -78,6 +84,8 @@ def main(filepath: str) -> None:
         card = card.replace("images/", "")
         card = reformat_card(card)
         card = convert_tex_delimiters(card)
+        card = remove_img_resize(card)
+
         converted.append(card)
 
     for img in images:
@@ -88,6 +96,7 @@ def main(filepath: str) -> None:
     new_file = filepath
     with open(new_file, "w") as f:
         f.writelines(converted)
+    mdformat.file(filepath)
 
 
 if __name__ == "__main__":
